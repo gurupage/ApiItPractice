@@ -56,6 +56,21 @@ jobs:
           echo "=== Available Memory ==="
           free -h
 
+      # 4.5 Wrapper / Gradle / Java / Repo資材チェック
+      - name: 🔍 Verify build assets (wrapper, gradle, java)
+        run: |
+          set -eux
+          echo "=== Repo root files ==="
+          ls -la
+          echo "=== Wrapper files ==="
+          test -f ./gradlew && echo "OK: gradlew exists" || (echo "NG: gradlew missing" && exit 1)
+          test -f ./gradle/wrapper/gradle-wrapper.jar && echo "OK: wrapper jar exists" || (echo "NG: wrapper jar missing" && exit 1)
+          cat ./gradle/wrapper/gradle-wrapper.properties
+          echo "=== Java ==="
+          java -version
+          echo "=== Gradle ==="
+          ./gradlew --version
+
       # 5. UT実行（高速、Mockのみ）+ 時間計測
       - name: 🧪 Run Unit Tests
         run: |
