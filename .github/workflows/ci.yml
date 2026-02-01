@@ -1,0 +1,195 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:  # 手動実行を許可
+
+# 環境変数（全ジョブ共通）
+env:
+  JAVA_VERSION: '21'
+  GRADLE_OPTS: -Dorg.gradle.daemon=false -Dorg.gradle.parallel=true -Dorg.gradle.caching=true
+
+jobs:
+  test:
+    name: Build and Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30  # 全体のタイムアウト（IT含む）
+
+    # Oracle Testcontainers用の設定
+    # Dockerが必要なため、ubuntu-latestにはデフォルトでDockerがインストールされている
+    # メモリとCPUを確保
+    env:
+      # Testcontainers設定
+      TESTCONTAINERS_RYUK_DISABLED: false  # リソースクリーンアップを有効化
+      # Docker設定
+      DOCKER_BUILDKIT: 1
+
+    steps:
+      # 1. コードのチェックアウト
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      # 2. JDKセットアップ
+      - name: ☕ Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+          cache: 'gradle'
+
+      # 3. Gradlewに実行権限を付与
+      - name: 🔧 Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      # 4. Dockerの状態確認（Testcontainers用）
+      - name: 🐳 Verify Docker
+        run: |
+          echo "=== Docker Version ==="
+          docker --version
+          echo ""
+          echo "=== Docker Info ==="
+          docker info
+          echo ""
+          echo "=== Available Memory ==="
+          free -h
+
+      # 5. UT実行（高速、Mockのみ）+ 時間計測
+      - name: 🧪 Run Unit Tests
+        run: |
+          echo "::group::📊 Unit Test Execution"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "🚀 Starting Unit Tests (UT)"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+          UT_START=$(date +%s)
+          ./gradlew unitTest --no-daemon --console=plain
+          UT_EXIT_CODE=$?
+          UT_END=$(date +%s)
+          UT_DURATION=$((UT_END - UT_START))
+
+          echo ""
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "✅ Unit Tests Completed"
+          echo "⏱️  Duration: ${UT_DURATION}s ($(printf '%02d:%02d' $((UT_DURATION/60)) $((UT_DURATION%60))))"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "::endgroup::"
+
+          # 実行時間を環境変数に保存
+          echo "UT_DURATION=${UT_DURATION}" >> $GITHUB_ENV
+
+          exit $UT_EXIT_CODE
+
+      # 6. IT実行（Testcontainers + Oracle XE）+ 時間計測
+      - name: 🔬 Run Integration Tests
+        timeout-minutes: 20  # IT専用のタイムアウト（Oracle起動含む）
+        run: |
+          echo "::group::📊 Integration Test Execution"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "🚀 Starting Integration Tests (IT)"
+          echo "📦 Using Testcontainers + Oracle XE"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+          IT_START=$(date +%s)
+          ./gradlew integrationTest --no-daemon --console=plain
+          IT_EXIT_CODE=$?
+          IT_END=$(date +%s)
+          IT_DURATION=$((IT_END - IT_START))
+
+          echo ""
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "✅ Integration Tests Completed"
+          echo "⏱️  Duration: ${IT_DURATION}s ($(printf '%02d:%02d' $((IT_DURATION/60)) $((IT_DURATION%60))))"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "::endgroup::"
+
+          # 実行時間を環境変数に保存
+          echo "IT_DURATION=${IT_DURATION}" >> $GITHUB_ENV
+
+          exit $IT_EXIT_CODE
+
+      # 7. Dockerコンテナのクリーンアップ確認
+      - name: 🧹 Check Docker Containers
+        if: always()
+        run: |
+          echo "=== Running Containers ==="
+          docker ps
+          echo ""
+          echo "=== All Containers (including stopped) ==="
+          docker ps -a
+          echo ""
+          echo "=== Docker Images ==="
+          docker images
+
+      # 8. JaCoCoレポート生成
+      - name: 📈 Generate JaCoCo Coverage Report
+        if: always()
+        run: |
+          echo "::group::📊 JaCoCo Report Generation"
+          ./gradlew jacocoTestReport --no-daemon --console=plain
+          echo "::endgroup::"
+
+      # 9. テスト実行時間サマリーの出力
+      - name: 📊 Test Execution Summary
+        if: always()
+        run: |
+          echo "## 📊 Test Execution Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Test Type | Duration | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----------|----------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| 🧪 Unit Tests | ${UT_DURATION}s ($(printf '%02d:%02d' $((${UT_DURATION:-0}/60)) $((${UT_DURATION:-0}%60)))) | ✅ |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🔬 Integration Tests | ${IT_DURATION}s ($(printf '%02d:%02d' $((${IT_DURATION:-0}/60)) $((${IT_DURATION:-0}%60)))) | ✅ |" >> $GITHUB_STEP_SUMMARY
+          echo "| **📦 Total** | **$((${UT_DURATION:-0} + ${IT_DURATION:-0}))s** | **✅** |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🎯 Performance Notes" >> $GITHUB_STEP_SUMMARY
+          echo "- UT expected: < 5s" >> $GITHUB_STEP_SUMMARY
+          echo "- IT expected: 3-6 minutes (includes Oracle container startup)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Improvement**: Container reuse can reduce IT time by 70-80%" >> $GITHUB_STEP_SUMMARY
+
+      # 10. テスト結果のアップロード
+      - name: 📤 Upload Test Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: |
+            build/test-results/**/*.xml
+            build/reports/tests/**
+          retention-days: 30
+
+      # 11. JaCoCoレポートのアップロード
+      - name: 📤 Upload JaCoCo Coverage Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacoco-coverage-report
+          path: |
+            build/reports/jacoco/test/html/
+            build/reports/jacoco/test/jacocoTestReport.xml
+          retention-days: 30
+
+      # 12. カバレッジサマリーをPRコメントに表示
+      - name: 💬 Add Coverage Comment to PR
+        id: jacoco
+        uses: madrapps/jacoco-report@v1.6.1
+        if: github.event_name == 'pull_request'
+        with:
+          paths: ${{ github.workspace }}/build/reports/jacoco/test/jacocoTestReport.xml
+          token: ${{ secrets.GITHUB_TOKEN }}
+          min-coverage-overall: 70
+          min-coverage-changed-files: 70
+          title: '📊 JaCoCo Coverage Report'
+
+      # 13. テスト失敗時の詳細ログ出力
+      - name: 📋 Print Test Failure Details
+        if: failure()
+        run: |
+          echo "::group::❌ Test Failure Logs"
+          echo "=== Unit Test Results ==="
+          find build/reports/tests/unitTest -name "*.html" -exec echo {} \;
+          echo ""
+          echo "=== Integration Test Results ==="
+          find build/reports/tests/integrationTest -name "*.html" -exec echo {} \;
+          echo "::endgroup::"

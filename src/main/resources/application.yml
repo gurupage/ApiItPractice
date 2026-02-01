@@ -1,0 +1,38 @@
+spring:
+  application:
+    name: api-practice
+
+  datasource:
+    url: jdbc:oracle:thin:@localhost:1521/XEPDB1
+    username: system
+    password: oracle
+    driver-class-name: oracle.jdbc.OracleDriver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate  # Flywayに任せる
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.OracleDialect
+
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    locations: classpath:db/migration
+
+# 外部API URL（IT時にWireMockで上書き）
+notification:
+  api:
+    url: http://localhost:8081/notifications
+
+user:
+  validation:
+    api:
+      url: http://localhost:8082/api/users
+
+logging:
+  level:
+    com.example.apipractice: DEBUG
+    org.springframework.web: INFO

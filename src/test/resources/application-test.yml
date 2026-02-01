@@ -1,0 +1,29 @@
+spring:
+  datasource:
+    # Testcontainersが動的にOracle接続情報を設定
+    # IT実行時に @DynamicPropertySource で上書きされる
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: true
+
+  flyway:
+    enabled: true
+    clean-on-validation-error: true
+
+# 外部API URL（IT時にWireMockのURLに上書き）
+notification:
+  api:
+    url: http://localhost:8081/notifications
+
+user:
+  validation:
+    api:
+      url: http://localhost:8082/api/users
+
+logging:
+  level:
+    com.example.apipractice: DEBUG
+    org.testcontainers: INFO
+    org.flywaydb: INFO
