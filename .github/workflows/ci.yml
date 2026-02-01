@@ -202,9 +202,27 @@ jobs:
         if: failure()
         run: |
           echo "::group::❌ Test Failure Logs"
-          echo "=== Unit Test Results ==="
-          find build/reports/tests/unitTest -name "*.html" -exec echo {} \;
+
+          echo "=== Unit Test Results (reports dir listing) ==="
+          ls -la build/reports || true
+          ls -la build/reports/tests || true
+          ls -la build/reports/tests/unitTest || true
+          ls -la build/reports/tests/test || true
+
           echo ""
-          echo "=== Integration Test Results ==="
-          find build/reports/tests/integrationTest -name "*.html" -exec echo {} \;
+          echo "=== Unit Test HTML files ==="
+          find build/reports/tests -maxdepth 3 -type f -name "*.html" -print 2>/dev/null || true
+
+          echo ""
+          echo "=== Unit Test XML results ==="
+          find build/test-results -maxdepth 3 -type f -name "*.xml" -print 2>/dev/null || true
+
+          echo ""
+          echo "=== Integration Test Results (reports dir listing) ==="
+          ls -la build/reports/tests/integrationTest || true
+
+          echo ""
+          echo "=== Integration Test HTML files ==="
+          find build/reports/tests/integrationTest -type f -name "*.html" -print 2>/dev/null || true
+
           echo "::endgroup::"

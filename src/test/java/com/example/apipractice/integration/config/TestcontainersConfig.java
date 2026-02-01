@@ -24,7 +24,7 @@ public abstract class TestcontainersConfig {
      * わざと static にしてテストクラスごとに起動させる（教材用）
      */
     @Container
-    static OracleContainer oracleContainer = new OracleContainer("gvenzl/oracle-xe:21-slim")
+    protected static OracleContainer oracleContainer = new OracleContainer("gvenzl/oracle-xe:21-slim")
             .withDatabaseName("testdb")
             .withUsername("testuser")
             .withPassword("testpass")

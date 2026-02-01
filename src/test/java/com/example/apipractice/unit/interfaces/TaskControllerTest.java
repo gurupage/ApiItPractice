@@ -39,13 +39,14 @@ class TaskControllerTest {
     void タスク作成APIがServiceを呼び出してレスポンスを返す() {
         // given
         CreateTaskRequest request = new CreateTaskRequest();
+        request.setUserId("user1");
         request.setTitle("Test Task");
         request.setDescription("Description");
 
         Task task = Task.create("Test Task", "Description");
         task.setId(1L);
 
-        when(taskService.createTask("Test Task", "Description")).thenReturn(task);
+        when(taskService.createTask("user1", "Test Task", "Description")).thenReturn(task);
 
         // when
         TaskResponse response = taskController.createTask(request);
@@ -54,7 +55,7 @@ class TaskControllerTest {
         assertThat(response.getId()).isEqualTo(1L);
         assertThat(response.getTitle()).isEqualTo("Test Task");
         assertThat(response.getStatus()).isEqualTo(TaskStatus.TODO);
-        verify(taskService, times(1)).createTask("Test Task", "Description");
+        verify(taskService, times(1)).createTask("user1", "Test Task", "Description");
     }
 
     @Test
